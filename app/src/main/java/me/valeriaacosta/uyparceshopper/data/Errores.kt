@@ -1,5 +1,6 @@
 package me.valeriaacosta.uyparceshopper.data
 
+import com.google.firebase.FirebaseException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthException
@@ -20,13 +21,17 @@ fun Throwable.mensaje(): String = when (this) {
     is FirebaseAuthInvalidUserException ->
         if (errorCode == "ERROR_USER_DISABLED") "Esta cuenta está bloqueada" else "Correo o contraseña incorrectos"
     is FirebaseAuthUserCollisionException -> "Ese correo ya tiene una cuenta"
-    is FirebaseAuthException -> "No se pudo iniciar sesión (${errorCode.lowercase().removePrefix("error_")})"
+    is FirebaseAuthException ->
+        if (errorCode == "ERROR_OPERATION_NOT_ALLOWED") "Falta activar el acceso con correo y contraseña en la consola de Firebase (Authentication)"
+        else "No se pudo iniciar sesión (${errorCode.lowercase().removePrefix("error_")})"
     is FirebaseTooManyRequestsException -> "Demasiados intentos. Espera unos minutos y vuelve a intentar"
     is FirebaseNetworkException -> "Sin conexión a internet"
     is FirebaseFirestoreException -> when (code) {
         Code.PERMISSION_DENIED -> "No tienes permiso para hacer esto"
         Code.UNAVAILABLE -> "Sin conexión a internet. Intenta de nuevo cuando tengas señal"
-        Code.NOT_FOUND -> "Ya no existe: puede que alguien lo haya eliminado"
+        Code.NOT_FOUND ->
+            if (message.orEmpty().contains("database", ignoreCase = true)) "Falta crear la base de datos Firestore en la consola de Firebase"
+            else "Ya no existe: puede que alguien lo haya eliminado"
         Code.ALREADY_EXISTS -> "Eso ya existe"
         Code.ABORTED, Code.FAILED_PRECONDITION -> "Alguien más lo cambió al mismo tiempo. Intenta de nuevo"
         Code.DEADLINE_EXCEEDED -> "La conexión está muy lenta. Intenta de nuevo"
@@ -34,5 +39,17 @@ fun Throwable.mensaje(): String = when (this) {
         Code.INVALID_ARGUMENT -> "Algún dato no es válido (por ejemplo, una foto demasiado grande)"
         else -> "No se pudo guardar (${code.name.lowercase()})"
     }
+    is FirebaseException -> mensajeDeConfiguracion(message) ?: "Algo salió mal. Intenta de nuevo"
     else -> "Algo salió mal. Intenta de nuevo"
+}
+
+/**
+ * Errores de configuración del proyecto de Firebase: le dicen a quien está instalando la app qué paso
+ * de la consola le falta. Devuelve null si el error no es de configuración.
+ */
+fun mensajeDeConfiguracion(detalle: String?): String? = when {
+    detalle == null -> null
+    "CONFIGURATION_NOT_FOUND" in detalle -> "Falta activar Authentication (correo y contraseña) en la consola de Firebase"
+    "API key not valid" in detalle -> "La configuración de Firebase no es válida: revisa el archivo google-services.json"
+    else -> null
 }

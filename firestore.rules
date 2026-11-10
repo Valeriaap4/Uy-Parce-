@@ -122,7 +122,11 @@ service cloud.firestore {
 
     // ─── Pagos ─────────────────────────────────────────────────────────────
     match /pagos/{id} {
-      allow read: if esEquipo() || (activo() && resource.data.clienteId == request.auth.uid);
+      // Al reportar un pago, la app primero revisa si ese pago ya se guardó en un intento anterior.
+      // Ese documento casi siempre todavía no existe (resource == null): consultarlo debe estar permitido.
+      allow get: if esEquipo()
+        || (activo() && (resource == null || resource.data.clienteId == request.auth.uid));
+      allow list: if esEquipo() || (activo() && resource.data.clienteId == request.auth.uid);
       allow create: if esCliente()
         && nuevo().clienteId == request.auth.uid
         && nuevo().estado == 'EN_REVISION'
