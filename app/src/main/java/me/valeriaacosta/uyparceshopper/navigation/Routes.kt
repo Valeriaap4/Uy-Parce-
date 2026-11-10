@@ -19,7 +19,22 @@ object Routes {
     const val PERFIL_EDITAR = "perfil/editar"
 
     /** Pantallas a las que se puede entrar sin sesión iniciada. */
-    val sinSesion = setOf(SPLASH, LOGIN, REGISTRO, REVISION, RECUPERAR)
+    val sinSesion = setOf(LOGIN, REGISTRO, RECUPERAR)
+
+    /** Pantallas de entrada: con la sesión activa no tienen sentido y se salta al inicio del rol. */
+    val deEntrada = setOf(SPLASH, LOGIN, REGISTRO, REVISION, RECUPERAR)
+
+    /**
+     * Si un rol puede estar en una ruta. El admin también usa las pantallas del operador y del
+     * supervisor (desde "Más"). Las comunes (perfil, pedido, factura…) son de todos.
+     */
+    fun permitida(ruta: String, rol: Rol): Boolean = when {
+        ruta.startsWith("cli/") -> rol == Rol.CLIENTE
+        ruta.startsWith("op/") -> rol == Rol.OPERADOR || rol == Rol.ADMIN
+        ruta.startsWith("sup/") -> rol == Rol.SUPERVISOR || rol == Rol.ADMIN
+        ruta.startsWith("adm/") -> rol == Rol.ADMIN
+        else -> true
+    }
     const val NOTIFICACIONES = "notificaciones"
     const val DETALLE_PEDIDO = "pedido/{numero}"
     const val FACTURA = "factura/{numero}"

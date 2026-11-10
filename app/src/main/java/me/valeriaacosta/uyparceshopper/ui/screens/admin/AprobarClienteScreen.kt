@@ -1,20 +1,21 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
-import me.valeriaacosta.uyparceshopper.data.*
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.HowToReg
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
-import me.valeriaacosta.uyparceshopper.data.DatosEjemplo
-import me.valeriaacosta.uyparceshopper.data.models.TipoCliente
+import kotlinx.coroutines.launch
+import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
+import me.valeriaacosta.uyparceshopper.data.fechaHora
+import me.valeriaacosta.uyparceshopper.data.mensaje
+import me.valeriaacosta.uyparceshopper.data.models.*
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.Muted
 import me.valeriaacosta.uyparceshopper.ui.theme.Red
-import me.valeriaacosta.uyparceshopper.ui.theme.UyParceTheme
 
 // ─── AprobarClienteScreen ────────────────────────────────────────────────────
 
@@ -25,23 +26,44 @@ fun AprobarClienteScreen(
     onClickBack: () -> Unit,
     onListo: () -> Unit
 ) {
-    val c = DatosEjemplo.porAprobar.firstOrNull { it.id == id } ?: return NoEncontrado("Aprobar cliente", onClickBack)
+    SegunCarga(rememberUsuario(id), "Aprobar cliente", onClickBack) { c ->
+        AprobarClienteContenido(c, onClickBack, onListo)
+    }
+}
+
+@Composable
+private fun AprobarClienteContenido(c: Usuario, onClickBack: () -> Unit, onListo: () -> Unit) {
+    val estado = LocalEstadoApp.current
     val mensaje = LocalMensaje.current
-    var tipo by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val a = estado.ajustes
+    var tipo by remember { mutableStateOf<TipoCliente?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var rechazar by remember { mutableStateOf(false) }
+    var guardando by remember { mutableStateOf(false) }
+    val pendiente = !c.aprobado && c.activo
 
-    UpScreen("Aprobar cliente", onClickBack, barraInferior = {
-        BotonSecundario("Rechazar", { rechazar = true }, Modifier.weight(1f), color = Red)
+    UpScreen("Aprobar cliente", onClickBack, barraInferior = if (!pendiente) null else ({
+        BotonSecundario("Rechazar", { rechazar = true }, Modifier.weight(1f), color = Red, habilitado = !guardando)
         BotonPrincipal("Aprobar", {
-            if (tipo == null) error = "Asigna el tipo de cliente"
+            val elegido = tipo
+            if (elegido == null) error = "Asigna el tipo de cliente"
             else {
-                mensaje("${c.nombre} aprobado como $tipo")
-                onListo()
+                guardando = true
+                scope.launch {
+                    estado.aprobarCliente(c, elegido)
+                        .onSuccess { mensaje("${c.nombre} aprobado como ${elegido.etiqueta}"); onListo() }
+                        .onFailure { mensaje(it.mensaje()) }
+                    guardando = false
+                }
             }
-        }, Modifier.weight(1.4f), Icons.Outlined.HowToReg)
-    }) {
+        }, Modifier.weight(1.4f), Icons.Outlined.HowToReg, cargando = guardando)
+    })) {
         ContenidoScroll {
+            if (!pendiente) Aviso(
+                if (c.aprobado) "Esta cuenta ya está aprobada (${c.tipoCliente?.etiqueta ?: c.rol.etiqueta})." else "Este registro fue rechazado.",
+                TonoChip.AZUL, Icons.Outlined.Info
+            )
             Tarjeta {
                 FilaDato("Nombre", c.nombre, true)
                 FilaDato("Cédula", c.cedula)
@@ -49,19 +71,35 @@ fun AprobarClienteScreen(
                 FilaDato("Correo", c.correo)
                 FilaDato("Ciudad", c.ciudad)
                 FilaDato("Dirección", c.direccion)
+                FilaDato("Se registró", fechaHora(c.creadoEn))
             }
-            Selector("Tipo de cliente", TipoCliente.entries.map { it.etiqueta }, tipo, { tipo = it; error = null }, error = error)
-            Text("Mayorista Avanzado 20 % · Parcero 25 % (USD). Detal sin comisión (COP).", color = Muted, fontSize = 13.sp)
+            if (pendiente) {
+                Selector("Tipo de cliente", TipoCliente.entries.map { it.etiqueta }, tipo?.etiqueta,
+                    { elegido -> tipo = TipoCliente.entries.first { it.etiqueta == elegido }; error = null }, error = error)
+                Text(
+                    "Mayorista Avanzado ${porcentaje(a.comisionAvanzado)} · Parcero ${porcentaje(a.comisionParcero)} (USD). " +
+                        "Detal sin comisión (COP).",
+                    color = Muted, fontSize = 13.sp
+                )
+            }
         }
     }
     if (rechazar) DialogoConfirmar(
         "Rechazar registro", "${c.nombre} no podrá entrar a la app.", "Rechazar",
-        { mensaje("Registro rechazado"); onListo() }, { rechazar = false }, peligro = true
+        {
+            guardando = true
+            scope.launch {
+                estado.rechazarCliente(c)
+                    .onSuccess { mensaje("Registro rechazado"); onListo() }
+                    .onFailure { mensaje(it.mensaje()) }
+                guardando = false
+            }
+        }, { rechazar = false }, peligro = true
     )
 }
 
 @Preview(showBackground = true)
 @Composable
 fun AprobarClienteScreenPreview() {
-    UyParceTheme { AprobarClienteScreen(id = "c5", onClickBack = {}, onListo = {}) }
+    VistaPrevia(Rol.ADMIN) { AprobarClienteScreen(id = "c5", onClickBack = {}, onListo = {}) }
 }

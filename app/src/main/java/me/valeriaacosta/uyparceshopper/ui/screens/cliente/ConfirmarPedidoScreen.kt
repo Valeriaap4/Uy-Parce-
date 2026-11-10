@@ -38,7 +38,6 @@ fun ConfirmarPedidoScreen(
 
     UpScreen("Confirmar pedido", onClickBack, barraInferior = {
         BotonPrincipal("Confirmar y pagar", {
-            estado.carrito.clear()
             onPedidoConfirmado(1016) // número de ejemplo; Firebase asignará el real
         }, Modifier.fillMaxWidth(), Icons.Outlined.Lock)
     }) {

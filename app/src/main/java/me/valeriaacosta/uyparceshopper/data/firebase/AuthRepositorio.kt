@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.app
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.auth
 import com.google.firebase.initialize
@@ -59,10 +60,17 @@ object AuthRepositorio {
         return usuario
     }
 
-    /** Envía el correo para crear una contraseña nueva (en español). */
+    /**
+     * Envía el correo para crear una contraseña nueva (en español). Si el correo no tiene cuenta no
+     * se avisa: así nadie puede averiguar quién está registrado.
+     */
     suspend fun recuperarClave(correo: String) {
         auth.setLanguageCode("es")
-        auth.sendPasswordResetEmail(correo.trim()).await()
+        try {
+            auth.sendPasswordResetEmail(correo.trim()).await()
+        } catch (e: FirebaseAuthInvalidUserException) {
+            // El correo no existe: se responde igual que si se hubiera enviado.
+        }
     }
 
     fun cerrarSesion() = auth.signOut()

@@ -19,6 +19,7 @@ import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
 import me.valeriaacosta.uyparceshopper.data.EstadoApp
 import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
+import me.valeriaacosta.uyparceshopper.data.Sesion
 import me.valeriaacosta.uyparceshopper.data.models.Rol
 import me.valeriaacosta.uyparceshopper.ui.components.LocalMensaje
 import me.valeriaacosta.uyparceshopper.ui.screens.admin.*
@@ -36,10 +37,11 @@ import me.valeriaacosta.uyparceshopper.ui.theme.*
  * reciben lambdas (onClickX) y aquí se decide a dónde lleva cada una.
  *
  * Reglas:
+ *  - La sesión manda: mientras carga se ve el Splash; sin sesión solo login, registro y
+ *    recuperar; con la cuenta en revisión, la pantalla de revisión; con sesión activa, las
+ *    pantallas de su rol. Iniciar o cerrar sesión borra el historial.
  *  - Cada rol tiene 4 pestañas (Routes.pestanas). En ellas se ve la barra inferior y no hay flecha de volver.
  *  - Cualquier otra pantalla tiene flecha de volver y no muestra la barra.
- *  - Iniciar o cerrar sesión borra todo el historial: "atrás" no regresa al login ni a la sesión anterior.
- *  - Sin sesión solo se puede estar en Splash, Login, Registro, Revisión o Recuperar.
  */
 @Composable
 fun AppNavigation() {
@@ -67,20 +69,42 @@ fun AppNavigation() {
         }
     }
 
-    /** Sale al login borrando el historial y lo que recordaban las pestañas. */
-    fun irAlLogin() {
-        myNavController.navigate(route = Routes.LOGIN) { popUpTo(myNavController.graph.id) { inclusive = true } }
+    /** Lleva a una pantalla de entrada (login o revisión) borrando el historial y lo que recordaban las pestañas. */
+    fun irSinHistorial(ruta: String) {
+        myNavController.navigate(route = ruta) { popUpTo(myNavController.graph.id) { inclusive = true } }
         Rol.entries.flatMap { Routes.pestanas(it) }.map { it.ruta }.distinct().forEach { myNavController.clearBackStack(it) }
     }
 
-    // Si se pierde la sesión (por ejemplo, Android cerró la app en segundo plano) se vuelve al login.
-    LaunchedEffect(estado.rol, rutaActual) {
-        if (estado.rol == null && rutaActual != null && rutaActual !in Routes.sinSesion) irAlLogin()
+    // La sesión decide a dónde se puede estar (también si Android cerró la app y la vuelve a abrir).
+    LaunchedEffect(estado.sesion, estado.rol, rutaActual) {
+        val ruta = rutaActual ?: return@LaunchedEffect
+        when (estado.sesion) {
+            Sesion.CARGANDO -> Unit
+            Sesion.SIN_SESION -> if (ruta !in Routes.sinSesion) irSinHistorial(Routes.LOGIN)
+            Sesion.EN_REVISION -> if (ruta != Routes.REVISION) irSinHistorial(Routes.REVISION)
+            Sesion.ACTIVA -> {
+                val rol = estado.rol ?: return@LaunchedEffect
+                if (ruta in Routes.deEntrada || !Routes.permitida(ruta, rol)) irAInicio(myNavController, rol)
+            }
+        }
     }
 
-    CompositionLocalProvider(
-        LocalMensaje provides { m -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(m) } }
-    ) {
+    fun mostrar(m: String) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(m)
+        }
+    }
+
+    // Avisos que llegan desde el estado (por ejemplo, si falla una escucha de datos).
+    LaunchedEffect(estado.aviso) {
+        estado.aviso?.let {
+            mostrar(it)
+            estado.aviso = null
+        }
+    }
+
+    CompositionLocalProvider(LocalMensaje provides { m -> mostrar(m) }) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
             containerColor = Bg,
@@ -96,25 +120,19 @@ fun AppNavigation() {
             ) {
                 // ── Autenticación y comunes ─────────────────────────────────
                 composable(route = Routes.SPLASH) {
-                    SplashScreen(onTerminar = { rol ->
-                        if (rol != null) irAInicio(myNavController, rol) else irAlLogin()
-                    })
+                    SplashScreen()
                 }
                 composable(route = Routes.LOGIN) {
                     LoginScreen(
-                        onLogin = { rol -> irAInicio(myNavController, rol) },
                         onClickRegister = { ir(Routes.REGISTRO) },
                         onClickForgotPassword = { ir(Routes.RECUPERAR) }
                     )
                 }
                 composable(route = Routes.REGISTRO) {
-                    RegisterScreen(
-                        onClickBack = ::volver,
-                        onRegistrado = { myNavController.navigate(route = Routes.REVISION) { popUpTo(Routes.LOGIN) } }
-                    )
+                    RegisterScreen(onClickBack = ::volver)
                 }
                 composable(route = Routes.REVISION) {
-                    CuentaRevisionScreen(onClickVolver = { myNavController.popBackStack(Routes.LOGIN, inclusive = false) })
+                    CuentaRevisionScreen(onClickVolver = { estado.cerrarSesion() })
                 }
                 composable(route = Routes.RECUPERAR) {
                     ForgotPasswordScreen(onClickBack = ::volver)
@@ -123,14 +141,15 @@ fun AppNavigation() {
                     PerfilScreen(
                         onClickBack = atras(Routes.PERFIL),
                         onClickNotificaciones = { ir(Routes.NOTIFICACIONES) },
-                        onLogout = { irAlLogin() }
+                        onLogout = { estado.cerrarSesion() }
                     )
                 }
                 composable(route = Routes.PERFIL_EDITAR) {
                     PerfilScreen(
                         onClickBack = ::volver,
                         onClickNotificaciones = { ir(Routes.NOTIFICACIONES) },
-                        onLogout = { irAlLogin() }
+                        onLogout = { estado.cerrarSesion() },
+                        onGuardado = ::volver
                     )
                 }
                 composable(route = Routes.NOTIFICACIONES) {
@@ -411,13 +430,20 @@ fun AppNavigation() {
 private fun BarraInferior(nav: NavHostController, estado: EstadoApp, pestanas: List<Pestana>, rutaActual: String?) {
     NavigationBar(containerColor = Color.White) {
         pestanas.forEach { p ->
+            // Contadores: lo que espera en cada pestaña.
+            val contador = when (p.ruta) {
+                Routes.CARRITO -> estado.prendasEnCarrito
+                Routes.PAGOS -> estado.porRevisar
+                Routes.POR_APROBAR -> estado.clientesPorAprobar.size
+                Routes.POR_COMPRAR -> estado.unidadesPorComprar
+                else -> 0
+            }
             NavigationBarItem(
                 selected = p.ruta == rutaActual,
                 onClick = { irAPestana(nav, p.ruta, pestanas) },
                 icon = {
-                    val enCarrito = estado.carrito.sumOf { it.cantidad }
-                    if (p.ruta == Routes.CARRITO && enCarrito > 0)
-                        BadgedBox(badge = { Badge(containerColor = Yellow, contentColor = Navy) { Text("$enCarrito") } }) {
+                    if (contador > 0)
+                        BadgedBox(badge = { Badge(containerColor = Yellow, contentColor = Navy) { Text(if (contador > 99) "99+" else "$contador") } }) {
                             Icon(p.icono, null)
                         }
                     else Icon(p.icono, null)

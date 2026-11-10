@@ -1,7 +1,5 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.auth
 
-import me.valeriaacosta.uyparceshopper.data.*
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +9,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,26 +19,51 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import me.valeriaacosta.uyparceshopper.data.DatosEjemplo
+import kotlinx.coroutines.launch
 import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
-import me.valeriaacosta.uyparceshopper.data.models.Rol
+import me.valeriaacosta.uyparceshopper.data.mensaje
+import me.valeriaacosta.uyparceshopper.data.models.*
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── PerfilScreen ────────────────────────────────────────────────────────────
 
-/** Pantalla 6. Perfil del usuario (todos los roles). */
+/**
+ * Pantalla 6. Perfil del usuario (todos los roles). El cliente edita aquí su teléfono, ciudad y
+ * dirección de entrega (los pedidos nuevos usan estos datos).
+ * onGuardado: se usa cuando se abre desde "Cambiar dirección" para volver al pedido después de guardar.
+ */
 @Composable
 fun PerfilScreen(
     onClickBack: (() -> Unit)? = null,
     onClickNotificaciones: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onGuardado: (() -> Unit)? = null
+) {
+    val u = LocalEstadoApp.current.usuario
+    if (u == null) {
+        UpScreen("Perfil", onClickBack) { Cargando() }
+        return
+    }
+    PerfilContenido(u, onClickBack, onClickNotificaciones, onLogout, onGuardado)
+}
+
+@Composable
+private fun PerfilContenido(
+    u: Usuario,
+    onClickBack: (() -> Unit)?,
+    onClickNotificaciones: () -> Unit,
+    onLogout: () -> Unit,
+    onGuardado: (() -> Unit)?
 ) {
     val estado = LocalEstadoApp.current
-    val u = estado.usuario ?: DatosEjemplo.laura
     val mensaje = LocalMensaje.current
-    var telefono by remember { mutableStateOf(u.telefono) }
-    var direccion by remember { mutableStateOf(u.direccion) }
+    val scope = rememberCoroutineScope()
+    var telefono by rememberSaveable(u.id) { mutableStateOf(u.telefono) }
+    var ciudad by rememberSaveable(u.id) { mutableStateOf(u.ciudad) }
+    var direccion by rememberSaveable(u.id) { mutableStateOf(u.direccion) }
+    var errores by remember { mutableStateOf(mapOf<String, String>()) }
+    var guardando by remember { mutableStateOf(false) }
     var salir by remember { mutableStateOf(false) }
 
     UpScreen("Perfil", onClickBack, cabecera = {
@@ -58,16 +82,38 @@ fun PerfilScreen(
     }) {
         ContenidoScroll {
             if (u.rol == Rol.CLIENTE) {
-                if (u.saldoAFavor > 0) Aviso("Tienes saldo a favor para tu próximo pedido.", TonoChip.VERDE, Icons.Outlined.Savings)
-                Tarjeta {
-                    FilaDato("Cédula", u.cedula)
-                    FilaDato("Ciudad", u.ciudad)
-                    FilaDato("Zona de envío", DatosEjemplo.zonaDe(u.ciudad).nombre)
+                val saldo = estado.miSaldo
+                if (saldo > 0) Aviso(
+                    "Tienes ${formatoDinero(saldo, u.moneda)} ${u.moneda} de saldo a favor: se descuenta solo en tu próximo pedido.",
+                    TonoChip.VERDE, Icons.Outlined.Savings
+                )
+                Tarjeta { FilaDato("Cédula", u.cedula) }
+                CampoTexto("Teléfono / WhatsApp", telefono, { errores = errores - "telefono"; telefono = it.filter { c -> c.isDigit() || c == ' ' } },
+                    teclado = KeyboardType.Phone, error = errores["telefono"])
+                Selector("Ciudad de entrega", Zonas.ciudades, ciudad.ifBlank { null }, { errores = errores - "ciudad"; ciudad = it }, error = errores["ciudad"])
+                if (ciudad.isNotBlank()) {
+                    val zona = estado.ajustes.zonaDe(ciudad)
+                    Text("Zona de envío: ${zona.nombre} · ${formatoDinero(zona.precioCop.toDouble(), Moneda.COP)} COP", color = Muted, fontSize = 13.sp)
                 }
-                CampoTexto("Teléfono", telefono, { telefono = it }, teclado = KeyboardType.Phone)
-                CampoTexto("Dirección de entrega", direccion, { direccion = it }, lineas = 2,
-                    error = if (direccion.length < 8) "Escribe la dirección completa" else null)
-                BotonPrincipal("Guardar cambios", { if (direccion.length >= 8) mensaje("Datos guardados") }, Modifier.fillMaxWidth())
+                CampoTexto("Dirección de entrega", direccion, { errores = errores - "direccion"; direccion = it }, lineas = 2,
+                    placeholder = "Calle, número, barrio, apto", error = errores["direccion"])
+                val hayCambios = telefono.trim() != u.telefono || ciudad != u.ciudad || direccion.trim() != u.direccion
+                BotonPrincipal("Guardar cambios", {
+                    val e = mutableMapOf<String, String>()
+                    if (telefono.filter(Char::isDigit).length != 10) e["telefono"] = "El celular tiene 10 dígitos"
+                    if (ciudad.isBlank()) e["ciudad"] = "Elige tu ciudad"
+                    if (direccion.trim().length < 8) e["direccion"] = "Escribe la dirección completa"
+                    errores = e
+                    if (e.isEmpty()) {
+                        guardando = true
+                        scope.launch {
+                            estado.actualizarMiContacto(telefono, ciudad, direccion)
+                                .onSuccess { mensaje("Datos guardados"); onGuardado?.invoke() }
+                                .onFailure { mensaje(it.mensaje()) }
+                            guardando = false
+                        }
+                    }
+                }, Modifier.fillMaxWidth(), habilitado = hayCambios, cargando = guardando)
                 FilaMenu(Icons.Outlined.Notifications, "Notificaciones", "Avisos de tus pedidos", onClickNotificaciones)
             } else {
                 Tarjeta {
@@ -80,13 +126,11 @@ fun PerfilScreen(
                 modifier = Modifier.align(Alignment.CenterHorizontally))
         }
     }
-    if (salir) DialogoConfirmar("Cerrar sesión", "¿Seguro que quieres salir?", "Salir", {
-        estado.cerrarSesion(); onLogout()
-    }, { salir = false }, peligro = true)
+    if (salir) DialogoConfirmar("Cerrar sesión", "¿Seguro que quieres salir?", "Salir", onLogout, { salir = false }, peligro = true)
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PerfilScreenPreview() {
-    UyParceTheme { PerfilScreen(onClickNotificaciones = {}, onLogout = {}) }
+    VistaPrevia { PerfilScreen(onClickNotificaciones = {}, onLogout = {}) }
 }

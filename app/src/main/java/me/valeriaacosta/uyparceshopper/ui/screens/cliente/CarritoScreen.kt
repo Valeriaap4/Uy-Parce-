@@ -75,9 +75,9 @@ fun CarritoScreen(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (l.producto.agotado) Chip("Agotado", TonoChip.ROJO)
-                        else SelectorCantidad(l.cantidad, { estado.cambiarCantidad(i, it) })
+                        else SelectorCantidad(l.cantidad, { estado.cambiarCantidad(l.producto.id, l.talla, it) })
                         Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = { estado.cambiarCantidad(i, 0) }) {
+                        TextButton(onClick = { estado.cambiarCantidad(l.producto.id, l.talla, 0) }) {
                             Icon(Icons.Outlined.Delete, null, tint = Red)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Quitar", color = Red)
