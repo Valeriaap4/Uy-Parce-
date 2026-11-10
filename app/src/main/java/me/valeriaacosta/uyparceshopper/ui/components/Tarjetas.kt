@@ -138,22 +138,6 @@ fun PestanasPildora(opciones: List<String>, seleccion: Int, alElegir: (Int) -> U
     }
 }
 
-/** Foto del producto. Mientras no hay fotos reales se dibuja un bloque de color con la inicial. */
-@Composable
-fun FotoProducto(producto: Producto, modifier: Modifier = Modifier, redondeo: Dp = 16.dp, marcarAgotado: Boolean = false) {
-    Box(
-        modifier.clip(RoundedCornerShape(redondeo)).background(Color(producto.colorFoto)),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(Icons.Outlined.Checkroom, null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.fillMaxSize(0.4f))
-        if (marcarAgotado && producto.agotado) {
-            Text("AGOTADO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp)).background(Red).padding(horizontal = 6.dp, vertical = 2.dp))
-        }
-    }
-}
-
 /** Fila de menú con icono y flecha (pantallas "Más" y "Ajustes"). */
 @Composable
 fun FilaMenu(icono: ImageVector, titulo: String, detalle: String? = null, alPulsar: () -> Unit) {

@@ -44,40 +44,63 @@ import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── Botones ───
 
+/*
+ * cargando = true: el botón muestra una rueda y no se puede tocar. Así, mientras se guarda algo en
+ * Firebase, un doble toque no crea dos pedidos o dos pagos.
+ */
+
 @Composable
-fun BotonPrincipal(texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null, habilitado: Boolean = true) {
+fun BotonPrincipal(
+    texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null,
+    habilitado: Boolean = true, cargando: Boolean = false
+) {
     Button(
-        onClick = alPulsar, enabled = habilitado,
+        onClick = alPulsar, enabled = habilitado && !cargando,
         modifier = modifier.heightIn(min = 54.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Navy, contentColor = Color.White)
     ) {
-        if (icono != null) { Icon(icono, null); Spacer(Modifier.width(8.dp)) }
-        Text(texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        ContenidoBoton(texto, icono, cargando, Color.White)
     }
 }
 
 @Composable
-fun BotonAmarillo(texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null) {
+fun BotonAmarillo(
+    texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null,
+    habilitado: Boolean = true, cargando: Boolean = false
+) {
     Button(
-        onClick = alPulsar, modifier = modifier.heightIn(min = 54.dp),
+        onClick = alPulsar, enabled = habilitado && !cargando, modifier = modifier.heightIn(min = 54.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Yellow, contentColor = Navy)
     ) {
-        if (icono != null) { Icon(icono, null); Spacer(Modifier.width(8.dp)) }
-        Text(texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        ContenidoBoton(texto, icono, cargando, Navy)
     }
 }
 
 @Composable
-fun BotonSecundario(texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null, color: Color = Navy) {
+fun BotonSecundario(
+    texto: String, alPulsar: () -> Unit, modifier: Modifier = Modifier, icono: ImageVector? = null,
+    color: Color = Navy, habilitado: Boolean = true, cargando: Boolean = false
+) {
     OutlinedButton(
-        onClick = alPulsar, modifier = modifier.heightIn(min = 54.dp),
+        onClick = alPulsar, enabled = habilitado && !cargando, modifier = modifier.heightIn(min = 54.dp),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, Line),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = color)
     ) {
-        if (icono != null) { Icon(icono, null); Spacer(Modifier.width(8.dp)) }
-        Text(texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        ContenidoBoton(texto, icono, cargando, color)
     }
+}
+
+@Composable
+private fun RowScope.ContenidoBoton(texto: String, icono: ImageVector?, cargando: Boolean, colorRueda: Color) {
+    if (cargando) {
+        CircularProgressIndicator(Modifier.size(20.dp), color = colorRueda, strokeWidth = 2.5.dp)
+        Spacer(Modifier.width(10.dp))
+    } else if (icono != null) {
+        Icon(icono, null)
+        Spacer(Modifier.width(8.dp))
+    }
+    Text(texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
 }

@@ -158,7 +158,6 @@ fun OpProductoScreen(
                 escanearTalla = null
             },
             alCerrar = { escanearTalla = null },
-            codigoSimulado = "0195866" + (100000..999999).random()
         )
     }
     if (agotar) DialogoConfirmar(
