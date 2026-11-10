@@ -1,7 +1,5 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
-import me.valeriaacosta.uyparceshopper.data.*
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,38 +7,49 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import me.valeriaacosta.uyparceshopper.data.DatosEjemplo
+import me.valeriaacosta.uyparceshopper.data.Listas
 import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
+import me.valeriaacosta.uyparceshopper.data.esHoy
+import me.valeriaacosta.uyparceshopper.data.fechaHoraCorta
 import me.valeriaacosta.uyparceshopper.data.models.EstadoPago
-import me.valeriaacosta.uyparceshopper.data.models.Precios
+import me.valeriaacosta.uyparceshopper.data.models.Pago
+import me.valeriaacosta.uyparceshopper.data.models.Rol
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── PagosScreen ─────────────────────────────────────────────────────────────
 
-/** Pantalla 25. Comprobantes de pago por revisar y ya revisados. */
+/**
+ * Pantalla 25. Comprobantes por revisar (en vivo, del más antiguo al más nuevo) y los ya revisados
+ * (se consultan al abrir la pestaña).
+ */
 @Composable
 fun PagosScreen(
     onClickBack: (() -> Unit)? = null,
     onClickPago: (id: String) -> Unit
 ) {
-    val ajustes = LocalEstadoApp.current.ajustes
-    var filtro by remember { mutableIntStateOf(0) }
-    val lista = DatosEjemplo.pagos.filter {
-        if (filtro == 0) it.estado == EstadoPago.EN_REVISION else it.estado != EstadoPago.EN_REVISION
+    val estado = LocalEstadoApp.current
+    var filtro by rememberSaveable { mutableIntStateOf(0) }
+    val porRevisar = estado.pagos.filter { it.estado == EstadoPago.EN_REVISION }
+    // Los revisados se vuelven a consultar cuando cambia la lista por revisar (por ejemplo, al aprobar uno).
+    val revisados by produceState<List<Pago>?>(null, porRevisar.size) {
+        value = estado.pagosRecientes().getOrDefault(emptyList()).filter { it.estado != EstadoPago.EN_REVISION }
     }
+    val lista = if (filtro == 0) porRevisar else revisados.orEmpty()
+    val cargando = if (filtro == 0) !estado.cargado(Listas.PAGOS) else revisados == null
 
     UpScreen("Pagos", onClickBack, cabecera = {
         ResumenCabecera(
-            "${DatosEjemplo.pagos.count { it.estado == EstadoPago.EN_REVISION }}" to "Por revisar",
-            "${DatosEjemplo.pagos.count { it.estado == EstadoPago.APROBADO }}" to "Aprobados hoy",
-            "0" to "Rechazados"
+            "${porRevisar.size}" to "Por revisar",
+            "${revisados.orEmpty().count { it.estado == EstadoPago.APROBADO && esHoy(it.revisadoEn) }}" to "Aprobados hoy",
+            "${revisados.orEmpty().count { it.estado == EstadoPago.RECHAZADO && esHoy(it.revisadoEn) }}" to "Rechazados hoy"
         )
     }) {
         LazyColumn(
@@ -50,19 +59,26 @@ fun PagosScreen(
         ) {
             item { PestanasPildora(listOf("Por revisar", "Revisados"), filtro, { filtro = it }) }
             items(lista, key = { it.id }) { p ->
-                val d = Precios.desglose(p.pedido, ajustes)
                 Tarjeta(alPulsar = { onClickPago(p.id) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("#${p.pedido.numero}", fontFamily = Mono, color = Blue, fontWeight = FontWeight.Bold,
+                        Text("#${p.numeroPedido}", fontFamily = Mono, color = Blue, fontWeight = FontWeight.Bold,
                             fontSize = 17.sp, modifier = Modifier.weight(1f))
-                        Dinero(d.total, d.moneda, 16.sp)
+                        Dinero(p.monto, p.moneda, 16.sp)
                     }
-                    Text(p.pedido.cliente.nombre, fontWeight = FontWeight.SemiBold)
+                    Text(p.clienteNombre, fontWeight = FontWeight.SemiBold)
                     Text("${p.medio} · ${p.referencia} · ${fechaHoraCorta(p.fecha)}", color = Muted, fontSize = 14.sp)
-                    Chip(p.estado.etiqueta, if (p.estado == EstadoPago.EN_REVISION) TonoChip.MORADO else TonoChip.VERDE)
+                    Chip(
+                        p.estado.etiqueta, when (p.estado) {
+                            EstadoPago.EN_REVISION -> TonoChip.MORADO
+                            EstadoPago.APROBADO -> TonoChip.VERDE
+                            EstadoPago.RECHAZADO -> TonoChip.ROJO
+                        }
+                    )
                 }
             }
-            if (lista.isEmpty()) item { EstadoVacio(Icons.Outlined.Payments, "No hay pagos aquí") }
+            if (lista.isEmpty()) item {
+                if (cargando) Cargando() else EstadoVacio(Icons.Outlined.Payments, if (filtro == 0) "No hay pagos por revisar" else "No hay pagos revisados")
+            }
         }
     }
 }
@@ -70,5 +86,5 @@ fun PagosScreen(
 @Preview(showBackground = true)
 @Composable
 fun PagosScreenPreview() {
-    UyParceTheme { PagosScreen(onClickPago = {}) }
+    VistaPrevia(Rol.SUPERVISOR) { PagosScreen(onClickPago = {}) }
 }
