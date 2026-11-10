@@ -1,7 +1,5 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.operador
 
-import me.valeriaacosta.uyparceshopper.data.*
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,9 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import me.valeriaacosta.uyparceshopper.data.DatosEjemplo
-import me.valeriaacosta.uyparceshopper.data.models.EstadoPedido
-import me.valeriaacosta.uyparceshopper.data.models.Producto
+import me.valeriaacosta.uyparceshopper.data.Listas
+import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
+import me.valeriaacosta.uyparceshopper.data.models.*
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.*
 
@@ -27,19 +25,21 @@ import me.valeriaacosta.uyparceshopper.ui.theme.*
 /** Lo que falta comprar de un producto en una talla, sumando todos los pedidos pagados. */
 data class Pendiente(val producto: Producto, val talla: String, val cantidad: Int, val pedidos: List<Int>)
 
-fun pendientesPorComprar(): List<Pendiente> =
-    DatosEjemplo.pedidos.filter { it.estado == EstadoPedido.PAGADO }
-        .flatMap { p -> p.lineas.filter { it.compradas < it.cantidad }.map { Triple(p.numero, it, it.cantidad - it.compradas) } }
-        .groupBy { it.second.producto.id + "|" + it.second.talla }
-        .map { (_, g) -> Pendiente(g.first().second.producto, g.first().second.talla, g.sumOf { it.third }, g.map { it.first }) }
+/** Pendientes por comprar de los pedidos pagados, del pedido más antiguo al más nuevo. */
+fun pendientesPorComprar(pedidos: List<Pedido>): List<Pendiente> =
+    pedidos.filter { it.estado == EstadoPedido.PAGADO }.sortedBy { it.numero }
+        .flatMap { p -> p.lineas.filter { it.porComprar > 0 }.map { Triple(p.numero, it, it.porComprar) } }
+        .groupBy { it.second.clave }
+        .map { (_, g) -> Pendiente(g.first().second.producto, g.first().second.talla, g.sumOf { it.third }, g.map { it.first }.distinct()) }
 
-/** Pantalla 20. Lista de compras agrupada por tienda. */
+/** Pantalla 20. Lista de compras (en vivo) agrupada por tienda. */
 @Composable
 fun PorComprarScreen(
     onClickBack: (() -> Unit)? = null,
     onClickRegistrar: () -> Unit
 ) {
-    val pendientes = pendientesPorComprar()
+    val estado = LocalEstadoApp.current
+    val pendientes = pendientesPorComprar(estado.pedidos)
     UpScreen("Por comprar", onClickBack, cabecera = {
         ResumenCabecera(
             "${pendientes.sumOf { it.cantidad }}" to "Prendas",
@@ -54,10 +54,10 @@ fun PorComprarScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { Text("Solo aparecen pedidos con el pago aprobado.", color = Muted) }
+            item { Text("Solo aparecen pedidos con el pago aprobado, del más antiguo al más nuevo.", color = Muted) }
             pendientes.groupBy { it.producto.tienda }.forEach { (tienda, lista) ->
-                item { TituloSeccion(tienda) }
-                items(lista, key = { it.producto.id + it.talla }) { p ->
+                item(key = "tienda-$tienda") { TituloSeccion(tienda) }
+                items(lista, key = { "${it.producto.id}|${it.talla}" }) { p ->
                     Tarjeta {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             FotoProducto(p.producto, Modifier.size(56.dp), 12.dp)
@@ -70,7 +70,9 @@ fun PorComprarScreen(
                     }
                 }
             }
-            if (pendientes.isEmpty()) item { EstadoVacio(Icons.Outlined.TaskAlt, "No hay nada pendiente por comprar") }
+            if (pendientes.isEmpty()) item {
+                if (estado.cargado(Listas.PEDIDOS)) EstadoVacio(Icons.Outlined.TaskAlt, "No hay nada pendiente por comprar") else Cargando()
+            }
         }
     }
 }
@@ -78,5 +80,5 @@ fun PorComprarScreen(
 @Preview(showBackground = true)
 @Composable
 fun PorComprarScreenPreview() {
-    UyParceTheme { PorComprarScreen(onClickRegistrar = {}) }
+    VistaPrevia(Rol.OPERADOR) { PorComprarScreen(onClickRegistrar = {}) }
 }
