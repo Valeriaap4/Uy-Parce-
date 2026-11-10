@@ -1,5 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.compartidas
 
+import me.valeriaacosta.uyparceshopper.data.*
+import me.valeriaacosta.uyparceshopper.data.models.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -58,7 +61,7 @@ fun FacturaScreen(
                 ) { Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(30.dp)) }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(num, style = MaterialTheme.typography.titleLarge)
-                    Text("${pedido.cliente.nombre} · ${factura?.fecha ?: pedido.fecha}", color = Muted)
+                    Text("${pedido.cliente.nombre} · ${fecha(factura?.fecha ?: pedido.fecha)}", color = Muted)
                 }
                 Chip("Pagada", TonoChip.VERDE)
             }
@@ -88,7 +91,7 @@ fun FacturaScreen(
                 }
                 HorizontalDivider(color = Line)
                 FilaDinero("Subtotal", d.productos, d.moneda)
-                if (d.comision > 0) FilaDinero("Comisión UyParce (${(d.porcentajeComision * 100).toInt()} %)", d.comision, d.moneda)
+                if (d.comision > 0) FilaDinero("Comisión UyParce (${porcentaje(d.porcentajeComision)})", d.comision, d.moneda)
                 if (d.envioInternacional > 0) FilaDinero("Envío internacional", d.envioInternacional, d.moneda)
                 FilaDinero("Envío nacional", d.envioNacional, d.moneda)
                 FilaDinero("Total", d.total, d.moneda, total = true)

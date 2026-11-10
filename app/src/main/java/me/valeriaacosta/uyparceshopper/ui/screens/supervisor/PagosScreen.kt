@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,7 +58,7 @@ fun PagosScreen(
                         Dinero(d.total, d.moneda, 16.sp)
                     }
                     Text(p.pedido.cliente.nombre, fontWeight = FontWeight.SemiBold)
-                    Text("${p.medio} · ${p.referencia} · ${p.fecha}", color = Muted, fontSize = 14.sp)
+                    Text("${p.medio} · ${p.referencia} · ${fechaHoraCorta(p.fecha)}", color = Muted, fontSize = 14.sp)
                     Chip(p.estado.etiqueta, if (p.estado == EstadoPago.EN_REVISION) TonoChip.MORADO else TonoChip.VERDE)
                 }
             }

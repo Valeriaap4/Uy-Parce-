@@ -1,5 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
+import me.valeriaacosta.uyparceshopper.data.*
+import me.valeriaacosta.uyparceshopper.data.models.*
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -62,7 +65,7 @@ fun AjPreciosScreen(onClickBack: () -> Unit, onGuardado: () -> Unit) {
         "Precio COP = (precio USD + envío estimado por peso) × tasa × (1 + margen). Los pedidos ya confirmados no cambian.",
         listOf(
             CampoNumero("Tasa del dólar (COP)", a.tasaDolar.toInt().toString(), 2000.0..8000.0),
-            CampoNumero("Margen detal (%)", (a.margenDetal * 100).toInt().toString(), 0.0..200.0)
+            CampoNumero("Margen detal (%)", porcentaje(a.margenDetal).removeSuffix(" %"), 0.0..200.0)
         ),
         onClickBack, onGuardado
     )
@@ -76,8 +79,8 @@ fun AjComisionesScreen(onClickBack: () -> Unit, onGuardado: () -> Unit) {
         "Comisiones",
         "Las facturas ya generadas conservan el porcentaje con el que se cobraron.",
         listOf(
-            CampoNumero("Mayorista Avanzado (%)", (a.comisionAvanzado * 100).toInt().toString(), 0.0..100.0),
-            CampoNumero("Mayorista Parcero (%)", (a.comisionParcero * 100).toInt().toString(), 0.0..100.0)
+            CampoNumero("Mayorista Avanzado (%)", porcentaje(a.comisionAvanzado).removeSuffix(" %"), 0.0..100.0),
+            CampoNumero("Mayorista Parcero (%)", porcentaje(a.comisionParcero).removeSuffix(" %"), 0.0..100.0)
         ),
         onClickBack, onGuardado
     )

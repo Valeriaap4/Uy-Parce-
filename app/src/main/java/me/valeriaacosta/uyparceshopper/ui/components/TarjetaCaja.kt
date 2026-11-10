@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.components
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
@@ -32,7 +34,7 @@ fun TarjetaCaja(c: Caja, alPulsar: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Chip(cantidad(c.prendas, "prenda"), TonoChip.GRIS)
             c.pesoLb?.let { Chip("$it lb · ${c.tipoEnvio?.etiqueta}", TonoChip.GRIS) }
-            c.fechaEnvio?.let { Chip("Enviada $it", TonoChip.GRIS) }
+            c.fechaEnvio?.let { Chip("Enviada ${fecha(it)}", TonoChip.GRIS) }
         }
     }
 }

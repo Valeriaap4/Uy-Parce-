@@ -1,5 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.components
 
+import me.valeriaacosta.uyparceshopper.data.*
+import me.valeriaacosta.uyparceshopper.data.models.*
+
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,7 +18,7 @@ fun TarjetaDesglose(d: Desglose, titulo: String = "Resumen") {
     Tarjeta {
         Text(titulo, style = MaterialTheme.typography.titleMedium)
         FilaDinero("Productos", d.productos, d.moneda)
-        if (d.comision > 0) FilaDinero("Comisión Personal Shopper (${(d.porcentajeComision * 100).toInt()} %)", d.comision, d.moneda)
+        if (d.comision > 0) FilaDinero("Comisión Personal Shopper (${porcentaje(d.porcentajeComision)})", d.comision, d.moneda)
         if (d.envioInternacional > 0) FilaDinero("Envío internacional", d.envioInternacional, d.moneda)
         FilaDinero("Envío nacional", d.envioNacional, d.moneda)
         HorizontalDivider(color = Line)

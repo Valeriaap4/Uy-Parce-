@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,7 +45,7 @@ fun PapeleraScreen(
                             Chip(e.tipo, TonoChip.GRIS)
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(e.nombre, fontWeight = FontWeight.Bold)
-                            Text("${e.eliminadoPor} · ${e.fecha}", color = Muted, fontSize = 14.sp)
+                            Text("${e.eliminadoPor} · ${fecha(e.fecha)}", color = Muted, fontSize = 14.sp)
                         }
                         TextButton(onClick = { elementos.remove(e); mensaje("${e.tipo} restaurado") }) {
                             Icon(Icons.Outlined.RestoreFromTrash, null, tint = Blue)

@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.compartidas
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -49,7 +51,7 @@ fun DetallePedidoScreen(
     UpScreen(
         titulo = "Pedido #$numero",
         onClickBack = onClickBack,
-        subtitulo = pedido.fecha,
+        subtitulo = fecha(pedido.fecha),
         barraInferior = when {
             !esCliente -> null
             pedido.estado == EstadoPedido.PENDIENTE_PAGO -> ({

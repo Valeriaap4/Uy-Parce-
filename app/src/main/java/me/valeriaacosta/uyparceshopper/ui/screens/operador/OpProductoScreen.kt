@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.operador
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

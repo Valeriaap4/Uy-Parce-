@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth

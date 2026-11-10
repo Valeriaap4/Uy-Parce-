@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,7 +34,7 @@ fun AuditoriaScreen(
                 Tarjeta {
                     Row {
                         Text(r.accion, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(r.fecha, color = Muted, fontSize = 13.sp)
+                        Text(fechaHoraCorta(r.fecha), color = Muted, fontSize = 13.sp)
                     }
                     Text(r.detalle, color = Muted)
                     Text(r.usuario, color = Blue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)

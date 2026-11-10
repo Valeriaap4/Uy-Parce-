@@ -1,5 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
+import me.valeriaacosta.uyparceshopper.data.*
+import me.valeriaacosta.uyparceshopper.data.models.*
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.Composable
@@ -26,9 +29,9 @@ fun AjustesScreen(
     UpScreen("Ajustes", onClickBack) {
         ContenidoScroll(10.dp) {
             FilaMenu(Icons.Outlined.CurrencyExchange, "Precios detal",
-                "Tasa ${formatoDinero(a.tasaDolar, Moneda.COP)} · margen ${(a.margenDetal * 100).toInt()} %") { onClickOpcion(Routes.AJ_PRECIOS) }
+                "Tasa ${formatoDinero(a.tasaDolar, Moneda.COP)} · margen ${porcentaje(a.margenDetal)}") { onClickOpcion(Routes.AJ_PRECIOS) }
             FilaMenu(Icons.Outlined.Percent, "Comisiones",
-                "Avanzado ${(a.comisionAvanzado * 100).toInt()} % · Parcero ${(a.comisionParcero * 100).toInt()} %") { onClickOpcion(Routes.AJ_COMISIONES) }
+                "Avanzado ${porcentaje(a.comisionAvanzado)} · Parcero ${porcentaje(a.comisionParcero)}") { onClickOpcion(Routes.AJ_COMISIONES) }
             FilaMenu(Icons.Outlined.FlightTakeoff, "Envío internacional", "Tarifas por libra y seguro") { onClickOpcion(Routes.AJ_ENVIO) }
             FilaMenu(Icons.Outlined.Map, "Zonas de envío nacional", "${DatosEjemplo.zonas.size} zonas") { onClickOpcion(Routes.AJ_ZONAS) }
             FilaMenu(Icons.Outlined.AccountBalance, "Medios de pago", "${DatosEjemplo.mediosPago.size} cuentas") { onClickOpcion(Routes.AJ_MEDIOS) }

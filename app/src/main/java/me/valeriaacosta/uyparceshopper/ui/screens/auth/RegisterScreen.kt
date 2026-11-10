@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.auth
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*

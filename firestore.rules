@@ -1,0 +1,175 @@
+rules_version = '2';
+
+// Reglas de seguridad de UyParce Shopper.
+// Se pegan en la consola de Firebase: Firestore Database → Reglas → Publicar.
+// Idea general:
+//  - Una cuenta sin aprobar o desactivada solo puede ver su propio usuario.
+//  - Cada cliente ve y escribe solo lo suyo, y solo en los pasos que le tocan.
+//  - El equipo (operador, supervisor, admin) trabaja con todo lo de su área.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Quién está pidiendo ───────────────────────────────────────────────
+    function autenticado() { return request.auth != null; }
+    function miRuta() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
+    function yo() { return get(miRuta()).data; }
+    function activo() {
+      return autenticado() && exists(miRuta()) && yo().activo == true && yo().aprobado == true;
+    }
+    function rol() { return yo().rol; }
+    function esAdmin() { return activo() && rol() == 'ADMIN'; }
+    function esSupervisor() { return activo() && rol() == 'SUPERVISOR'; }
+    function esCliente() { return activo() && rol() == 'CLIENTE'; }
+    function esEquipo() { return activo() && rol() in ['ADMIN', 'SUPERVISOR', 'OPERADOR']; }
+    function supervisorOAdmin() { return activo() && rol() in ['ADMIN', 'SUPERVISOR']; }
+    function operadorOAdmin() { return activo() && rol() in ['ADMIN', 'OPERADOR']; }
+
+    // ─── Ayudas ────────────────────────────────────────────────────────────
+    function nuevo() { return request.resource.data; }
+    function soloCambia(campos) { return nuevo().diff(resource.data).affectedKeys().hasOnly(campos); }
+    function texto(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function rutaPedido(numero) { return /databases/$(database)/documents/pedidos/$(string(numero)); }
+
+    // ─── Usuarios ──────────────────────────────────────────────────────────
+    match /usuarios/{uid} {
+      allow read: if (autenticado() && request.auth.uid == uid) || esEquipo();
+      // Registro: cada quien crea su propio documento como cliente pendiente de aprobación.
+      allow create: if autenticado() && request.auth.uid == uid
+        && nuevo().id == uid
+        && nuevo().rol == 'CLIENTE' && nuevo().aprobado == false && nuevo().activo == true
+        && nuevo().tipoCliente == null
+        && texto(nuevo().nombre, 120) && texto(nuevo().correo, 200);
+      // El admin crea las cuentas del equipo.
+      allow create: if esAdmin() && nuevo().id == uid;
+      allow update: if esAdmin()
+        || (esSupervisor() && resource.data.rol == 'CLIENTE'
+            && soloCambia(['nombre', 'cedula', 'telefono', 'ciudad', 'direccion']))
+        || (autenticado() && request.auth.uid == uid
+            && soloCambia(['nombre', 'telefono', 'ciudad', 'direccion']));
+      allow delete: if false;
+    }
+
+    // ─── Ajustes del negocio y contadores ──────────────────────────────────
+    match /config/{doc} {
+      allow read: if activo();
+      allow write: if esAdmin();
+    }
+    match /contadores/{tipo} {
+      allow read: if activo();
+      allow create, update: if esEquipo();
+      // El cliente solo avanza el contador de pedidos en 1, y solo si en la misma
+      // transacción crea el pedido con ese número.
+      allow update: if esCliente() && tipo == 'pedidos'
+        && soloCambia(['ultimo'])
+        && nuevo().ultimo == resource.data.ultimo + 1
+        && existsAfter(rutaPedido(nuevo().ultimo));
+    }
+
+    // ─── Catálogo y fotos ──────────────────────────────────────────────────
+    match /productos/{id} {
+      allow read: if activo();
+      allow create, update, delete: if operadorOAdmin();
+    }
+    match /fotos/{id} {
+      // Fotos de productos: cualquier cuenta activa. Comprobantes de pago: su dueño y el equipo.
+      allow read: if activo()
+        && (resource.data.tipo == 'producto' || resource.data.creadoPor == request.auth.uid || esEquipo());
+      allow create: if activo()
+        && nuevo().creadoPor == request.auth.uid
+        && nuevo().datos is bytes && nuevo().datos.size() < 1000000
+        && ((nuevo().tipo == 'producto' && operadorOAdmin()) || nuevo().tipo == 'comprobante');
+      allow update: if false;
+      allow delete: if esEquipo();
+    }
+
+    // ─── Carrito ───────────────────────────────────────────────────────────
+    match /carritos/{uid} {
+      // El equipo lo lee para avisar cuando un producto se agota.
+      allow read: if (autenticado() && request.auth.uid == uid) || esEquipo();
+      allow write: if activo() && request.auth.uid == uid;
+    }
+
+    // ─── Pedidos ───────────────────────────────────────────────────────────
+    match /pedidos/{numero} {
+      function esMio() { return resource.data.clienteId == request.auth.uid; }
+
+      allow read: if esEquipo() || (activo() && esMio());
+      allow create: if esCliente()
+        && nuevo().clienteId == request.auth.uid
+        && nuevo().numero == int(numero)
+        && nuevo().estado == 'PENDIENTE_PAGO'
+        && nuevo().saldoAplicado >= 0 && nuevo().saldoAplicado <= nuevo().desglose.total
+        && nuevo().faltantes.size() == 0 && nuevo().resoluciones.size() == 0
+        && getAfter(/databases/$(database)/documents/contadores/pedidos).data.ultimo == int(numero);
+      allow update: if esEquipo()
+        || (esCliente() && esMio() && (
+             // Cancelar antes de pagar (o porque venció el plazo)
+             (resource.data.estado == 'PENDIENTE_PAGO' && nuevo().estado == 'CANCELADO'
+               && soloCambia(['estado', 'canceladoPor', 'motivoCancelacion']))
+             // Reportar el pago
+          || (resource.data.estado == 'PENDIENTE_PAGO' && nuevo().estado == 'PAGO_EN_REVISION'
+               && soloCambia(['estado', 'motivoRechazo']))
+             // "Recibí mi pedido"
+          || (resource.data.estado == 'ENVIADO' && nuevo().estado == 'ENTREGADO'
+               && soloCambia(['estado', 'entregadoEn']))
+             // Elegir qué hacer con un faltante: solo se agregan respuestas, no se cambian
+          || (soloCambia(['resoluciones'])
+               && nuevo().resoluciones.diff(resource.data.resoluciones).removedKeys().size() == 0
+               && nuevo().resoluciones.diff(resource.data.resoluciones).changedKeys().size() == 0)
+        ));
+      allow delete: if esAdmin();
+    }
+
+    // ─── Pagos ─────────────────────────────────────────────────────────────
+    match /pagos/{id} {
+      allow read: if esEquipo() || (activo() && resource.data.clienteId == request.auth.uid);
+      allow create: if esCliente()
+        && nuevo().clienteId == request.auth.uid
+        && nuevo().estado == 'EN_REVISION'
+        && get(rutaPedido(nuevo().numeroPedido)).data.clienteId == request.auth.uid;
+      allow update: if supervisorOAdmin();
+      allow delete: if false;
+    }
+
+    // ─── Facturas ──────────────────────────────────────────────────────────
+    match /facturas/{numero} {
+      allow read: if esEquipo() || (activo() && resource.data.clienteId == request.auth.uid);
+      allow create: if supervisorOAdmin();
+      allow update, delete: if esAdmin();
+    }
+
+    // ─── Cajas ─────────────────────────────────────────────────────────────
+    match /cajas/{codigo} {
+      allow read, create, update: if esEquipo();
+      allow delete: if operadorOAdmin();
+    }
+
+    // ─── Gastos ────────────────────────────────────────────────────────────
+    match /gastos/{id} {
+      allow read, create: if supervisorOAdmin();
+      allow update, delete: if esAdmin();
+    }
+
+    // ─── Avisos dentro de la app ───────────────────────────────────────────
+    match /notificaciones/{id} {
+      allow read: if autenticado() && resource.data.para == request.auth.uid;
+      allow create: if esEquipo() || (activo() && nuevo().para == request.auth.uid);
+      allow update: if autenticado() && resource.data.para == request.auth.uid && soloCambia(['leida']);
+      allow delete: if autenticado() && resource.data.para == request.auth.uid;
+    }
+
+    // ─── Auditoría: solo se agregan registros; nadie los edita ni los borra ─
+    match /auditoria/{id} {
+      allow create: if activo() && nuevo().usuarioId == request.auth.uid;
+      allow read: if esAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── Papelera ──────────────────────────────────────────────────────────
+    match /papelera/{id} {
+      allow create: if esEquipo();
+      allow read, delete: if esAdmin();
+      allow update: if false;
+    }
+  }
+}

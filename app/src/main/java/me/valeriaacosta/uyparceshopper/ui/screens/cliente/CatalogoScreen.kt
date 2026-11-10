@@ -1,5 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.cliente
 
+import me.valeriaacosta.uyparceshopper.data.*
+import me.valeriaacosta.uyparceshopper.data.models.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,7 +74,7 @@ fun CatalogoScreen(
                     BarraBuscar(buscar, { buscar = it }, "Buscar por nombre o marca")
                     PestanasPildora(categorias, categoria, { categoria = it })
                     if (tipo.esMayorista) Aviso(
-                        "Precios del outlet en USD. Al pagar se suma tu comisión (${(tipo.comision * 100).toInt()} %) y el envío.",
+                        "Precios del outlet en USD. Al pagar se suma tu comisión (${porcentaje(Precios.comisionDe(tipo, estado.ajustes))}) y el envío.",
                         TonoChip.AZUL
                     )
                 }

@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +48,7 @@ fun FacturasScreen(
                             modifier = Modifier.weight(1f))
                         Dinero(d.total, d.moneda, 15.sp)
                     }
-                    Text("${f.pedido.cliente.nombre} · ${f.fecha}", color = Muted)
+                    Text("${f.pedido.cliente.nombre} · ${fecha(f.fecha)}", color = Muted)
                 }
             }
         }

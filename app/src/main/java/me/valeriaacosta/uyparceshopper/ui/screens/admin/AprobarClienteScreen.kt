@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.admin
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.HowToReg
 import androidx.compose.material3.Text

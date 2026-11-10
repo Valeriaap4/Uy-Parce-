@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.components
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet

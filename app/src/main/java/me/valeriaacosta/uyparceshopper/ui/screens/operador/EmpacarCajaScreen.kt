@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.operador
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -91,13 +93,13 @@ fun EmpacarCajaScreen(
                 Tarjeta {
                     Text("Envío internacional", style = MaterialTheme.typography.titleMedium)
                     CampoTexto("Peso real (lb)", peso, { errores = errores - "peso"; peso = it }, teclado = KeyboardType.Decimal, error = errores["peso"])
-                    Selector("Tipo de envío", TipoEnvio.entries.map { "${it.etiqueta} · $${it.usdPorLibra}/lb" }, tipoEnvio,
+                    Selector("Tipo de envío", TipoEnvio.entries.map { "${it.etiqueta} · $${ajustes.tarifaDe(it)}/lb" }, tipoEnvio,
                         { errores = errores - "envio"; tipoEnvio = it }, error = errores["envio"])
                     val t = TipoEnvio.entries.firstOrNull { tipoEnvio?.startsWith(it.etiqueta) == true }
                     val p = peso.toDoubleOrNull()
                     if (t != null && p != null) Text(
-                        "$p lb × $${t.usdPorLibra} + seguro $${ajustes.seguroUsd.toInt()} = " +
-                            "${formatoDinero(p * t.usdPorLibra + ajustes.seguroUsd, Moneda.USD)} USD",
+                        "$p lb × $${ajustes.tarifaDe(t)} + seguro $${ajustes.seguroUsd.toInt()} = " +
+                            "${formatoDinero(p * ajustes.tarifaDe(t) + ajustes.seguroUsd, Moneda.USD)} USD",
                         color = Muted
                     )
                     Text("El cliente ya pagó un envío estimado; la diferencia la asume el negocio.", color = Muted, fontSize = 13.sp)

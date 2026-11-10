@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,7 +66,7 @@ fun RevisarPagoScreen(
                 FilaDato("Cliente", pago.pedido.cliente.nombre, true)
                 FilaDato("Medio", pago.medio)
                 FilaDato("Referencia", pago.referencia)
-                FilaDato("Fecha reportada", pago.fecha)
+                FilaDato("Fecha reportada", pago.fechaPago)
                 HorizontalDivider(color = Line)
                 FilaDinero("Total esperado", d.total, d.moneda, total = true)
             }

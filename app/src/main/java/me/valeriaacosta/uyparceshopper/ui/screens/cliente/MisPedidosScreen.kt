@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.cliente
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -52,7 +54,7 @@ fun MisPedidosScreen(
                 Tarjeta(alPulsar = { onClickPedido(p.numero) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("#${p.numero}", fontFamily = Mono, color = Blue, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text("  · ${p.fecha}", color = Muted, modifier = Modifier.weight(1f))
+                        Text("  · ${fecha(p.fecha)}", color = Muted, modifier = Modifier.weight(1f))
                         Dinero(d.total, d.moneda, 15.sp)
                     }
                     Text(p.lineas.joinToString { it.producto.nombre }, maxLines = 1, overflow = TextOverflow.Ellipsis)

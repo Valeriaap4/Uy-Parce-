@@ -1,5 +1,7 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.supervisor
 
+import me.valeriaacosta.uyparceshopper.data.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +48,7 @@ fun GastosScreen(
                         Text(g.descripcion, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Dinero(g.monto, g.moneda, 15.sp)
                     }
-                    Text("${g.proveedor} · ${g.fecha}", color = Muted, fontSize = 14.sp)
+                    Text("${g.proveedor} · ${fecha(g.fecha)}", color = Muted, fontSize = 14.sp)
                     Chip(g.categoria, TonoChip.GRIS)
                 }
             }
