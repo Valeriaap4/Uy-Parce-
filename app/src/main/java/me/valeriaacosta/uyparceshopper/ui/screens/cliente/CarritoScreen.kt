@@ -1,10 +1,8 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.cliente
 
-import me.valeriaacosta.uyparceshopper.data.*
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ShoppingBag
@@ -19,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import me.valeriaacosta.uyparceshopper.data.EstadoApp
+import me.valeriaacosta.uyparceshopper.data.Listas
 import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
 import me.valeriaacosta.uyparceshopper.data.models.Precios
 import me.valeriaacosta.uyparceshopper.data.models.TipoCliente
@@ -27,7 +27,10 @@ import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── CarritoScreen ───────────────────────────────────────────────────────────
 
-/** Pantalla 9. Prendas del carrito, cantidades y aviso de agotados. */
+/**
+ * Pantalla 9. Prendas del carrito (guardado en Firebase), cantidades y aviso de agotados.
+ * Los precios y los agotados se ven en vivo con el catálogo de hoy.
+ */
 @Composable
 fun CarritoScreen(
     onClickProducto: (id: String) -> Unit,
@@ -53,8 +56,11 @@ fun CarritoScreen(
         })
     ) {
         if (carrito.isEmpty()) {
-            EstadoVacio(Icons.Outlined.ShoppingBag, "Tu carrito está vacío")
-            BotonAmarillo("Ver catálogo", onClickVerCatalogo, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+            if (!estado.cargado(Listas.CARRITO) || !estado.cargado(Listas.PRODUCTOS)) Cargando()
+            else {
+                EstadoVacio(Icons.Outlined.ShoppingBag, "Tu carrito está vacío")
+                BotonAmarillo("Ver catálogo", onClickVerCatalogo, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+            }
         } else LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(16.dp),
@@ -63,7 +69,8 @@ fun CarritoScreen(
             if (hayAgotados) item {
                 Aviso("Hay productos agotados. Quítalos para poder continuar.", TonoChip.ROJO, Icons.Outlined.Warning)
             }
-            itemsIndexed(carrito, key = { _, l -> l.producto.id + l.talla }) { i, l ->
+            // Cada línea se identifica por producto y talla (no por su posición en la lista).
+            items(carrito, key = { it.clave }) { l ->
                 Tarjeta(alPulsar = { onClickProducto(l.producto.id) }) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FotoProducto(l.producto, Modifier.size(72.dp))
@@ -75,7 +82,7 @@ fun CarritoScreen(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (l.producto.agotado) Chip("Agotado", TonoChip.ROJO)
-                        else SelectorCantidad(l.cantidad, { estado.cambiarCantidad(l.producto.id, l.talla, it) })
+                        else SelectorCantidad(l.cantidad, { estado.cambiarCantidad(l.producto.id, l.talla, it) }, maximo = EstadoApp.MAX_UNIDADES)
                         Spacer(modifier = Modifier.weight(1f))
                         TextButton(onClick = { estado.cambiarCantidad(l.producto.id, l.talla, 0) }) {
                             Icon(Icons.Outlined.Delete, null, tint = Red)
@@ -92,5 +99,5 @@ fun CarritoScreen(
 @Preview(showBackground = true)
 @Composable
 fun CarritoScreenPreview() {
-    UyParceTheme { CarritoScreen(onClickProducto = {}, onClickContinuar = {}, onClickVerCatalogo = {}) }
+    VistaPrevia { CarritoScreen(onClickProducto = {}, onClickContinuar = {}, onClickVerCatalogo = {}) }
 }

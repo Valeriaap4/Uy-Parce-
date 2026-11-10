@@ -137,15 +137,15 @@ fun BarraBuscar(valor: String, alCambiar: (String) -> Unit, placeholder: String,
     CampoTexto("", valor, alCambiar, modifier, placeholder = placeholder, iconoInicio = Icons.Outlined.Search)
 }
 
-/** Control de cantidad − n + */
+/** Control de cantidad − n + (entre mínimo y máximo). */
 @Composable
-fun SelectorCantidad(cantidad: Int, alCambiar: (Int) -> Unit, minimo: Int = 1) {
+fun SelectorCantidad(cantidad: Int, alCambiar: (Int) -> Unit, minimo: Int = 1, maximo: Int = 99) {
     Row(
         Modifier.clip(RoundedCornerShape(14.dp)).background(Field),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = { if (cantidad > minimo) alCambiar(cantidad - 1) }) { Icon(Icons.Outlined.Remove, "Menos") }
+        IconButton(onClick = { if (cantidad > minimo) alCambiar(cantidad - 1) }, enabled = cantidad > minimo) { Icon(Icons.Outlined.Remove, "Menos") }
         Text("$cantidad", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.widthIn(min = 24.dp))
-        IconButton(onClick = { alCambiar(cantidad + 1) }) { Icon(Icons.Outlined.Add, "Más") }
+        IconButton(onClick = { if (cantidad < maximo) alCambiar(cantidad + 1) }, enabled = cantidad < maximo) { Icon(Icons.Outlined.Add, "Más") }
     }
 }

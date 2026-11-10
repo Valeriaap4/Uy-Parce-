@@ -1,8 +1,5 @@
 package me.valeriaacosta.uyparceshopper.ui.screens.cliente
 
-import me.valeriaacosta.uyparceshopper.data.*
-import me.valeriaacosta.uyparceshopper.data.models.*
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +14,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -25,17 +23,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import me.valeriaacosta.uyparceshopper.data.DatosEjemplo
+import me.valeriaacosta.uyparceshopper.data.Listas
 import me.valeriaacosta.uyparceshopper.data.LocalEstadoApp
-import me.valeriaacosta.uyparceshopper.data.models.Precios
-import me.valeriaacosta.uyparceshopper.data.models.Producto
-import me.valeriaacosta.uyparceshopper.data.models.TipoCliente
+import me.valeriaacosta.uyparceshopper.data.models.*
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── CatalogoScreen ──────────────────────────────────────────────────────────
 
-/** Pantalla 7. Catálogo en cuadrícula con buscador y filtro por categoría. */
+/** Pantalla 7. Catálogo en cuadrícula (en vivo) con buscador y filtro por categoría. */
 @Composable
 fun CatalogoScreen(
     onClickProducto: (id: String) -> Unit,
@@ -43,22 +39,25 @@ fun CatalogoScreen(
 ) {
     val estado = LocalEstadoApp.current
     val tipo = estado.usuario?.tipoCliente ?: TipoCliente.DETAL
-    var buscar by remember { mutableStateOf("") }
-    var categoria by remember { mutableIntStateOf(0) }
-    val categorias = listOf("Todo") + DatosEjemplo.categorias.map { it.nombre }
-    val lista = DatosEjemplo.productos.filter {
-        (categoria == 0 || it.categoria.nombre == categorias[categoria]) &&
+    var buscar by rememberSaveable { mutableStateOf("") }
+    // Se guarda el nombre de la categoría (no la posición): así no cambia si llegan categorías nuevas.
+    var categoria by rememberSaveable { mutableStateOf("Todo") }
+    val categorias = listOf("Todo") + estado.ajustes.categorias.map { it.nombre }
+        .filter { nombre -> estado.productos.any { it.categoria.nombre == nombre } }
+    val lista = estado.productos.filter {
+        (categoria == "Todo" || it.categoria.nombre == categoria) &&
             (buscar.isBlank() || it.nombre.contains(buscar, true) || it.marca.contains(buscar, true))
-    }
+    }.sortedBy { it.agotado } // los agotados al final
+    val noLeidas = estado.noLeidas
 
     UpScreen(
         titulo = "Catálogo",
         subtitulo = "Hola, ${estado.usuario?.nombre?.substringBefore(" ") ?: "parce"} · ${tipo.etiqueta}",
         acciones = {
             IconButton(onClick = onClickNotificaciones) {
-                BadgedBox(badge = { Badge(containerColor = Yellow, contentColor = Navy) { Text("2") } }) {
+                if (noLeidas > 0) BadgedBox(badge = { Badge(containerColor = Yellow, contentColor = Navy) { Text("$noLeidas") } }) {
                     Icon(Icons.Outlined.Notifications, "Notificaciones", tint = Color.White)
-                }
+                } else Icon(Icons.Outlined.Notifications, "Notificaciones", tint = Color.White)
             }
         }
     ) {
@@ -72,7 +71,7 @@ fun CatalogoScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     BarraBuscar(buscar, { buscar = it }, "Buscar por nombre o marca")
-                    PestanasPildora(categorias, categoria, { categoria = it })
+                    PestanasPildora(categorias, categorias.indexOf(categoria).coerceAtLeast(0), { categoria = categorias[it] })
                     if (tipo.esMayorista) Aviso(
                         "Precios del outlet en USD. Al pagar se suma tu comisión (${porcentaje(Precios.comisionDe(tipo, estado.ajustes))}) y el envío.",
                         TonoChip.AZUL
@@ -83,7 +82,11 @@ fun CatalogoScreen(
                 TarjetaProducto(p, Precios.precioUnitario(p, tipo, estado.ajustes), tipo) { onClickProducto(p.id) }
             }
             if (lista.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                EstadoVacio(Icons.Outlined.SearchOff, "No encontramos productos con esa búsqueda")
+                when {
+                    !estado.cargado(Listas.PRODUCTOS) -> Cargando()
+                    estado.productos.isEmpty() -> EstadoVacio(Icons.Outlined.SearchOff, "Todavía no hay productos en el catálogo")
+                    else -> EstadoVacio(Icons.Outlined.SearchOff, "No encontramos productos con esa búsqueda")
+                }
             }
         }
     }
@@ -111,5 +114,5 @@ private fun TarjetaProducto(p: Producto, precio: Double, tipo: TipoCliente, onCl
 @Preview(showBackground = true)
 @Composable
 fun CatalogoScreenPreview() {
-    UyParceTheme { CatalogoScreen(onClickProducto = {}, onClickNotificaciones = {}) }
+    VistaPrevia { CatalogoScreen(onClickProducto = {}, onClickNotificaciones = {}) }
 }
