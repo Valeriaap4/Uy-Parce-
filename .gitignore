@@ -1,0 +1,14 @@
+# Android Studio / Gradle
+*.iml
+.gradle/
+.kotlin/
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.idea/
+.DS_Store
+
+# Configuración de Firebase: no se sube al repositorio
+app/google-services.json
