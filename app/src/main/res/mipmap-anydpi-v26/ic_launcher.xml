@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ícono adaptable de la app (Android 8 en adelante). El launcher de cada celular lo recorta con su
+  forma (círculo, cuadrado redondeado…), por eso el dibujo "Uy!" va al 68 % del lienzo y el borde
+  queda del mismo azul del fondo. El monocromo se usa cuando la persona activa los íconos temáticos.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>
