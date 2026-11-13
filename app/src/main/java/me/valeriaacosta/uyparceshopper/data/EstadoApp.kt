@@ -205,7 +205,10 @@ class EstadoApp : ViewModel() {
         usuario = u
         when {
             !u.activo -> {
-                avisoSesion = if (!u.aprobado) "Tu registro no fue aprobado. Si crees que es un error, escríbele a UyParce."
+                // Quien se vuelve a registrar después de un rechazo entra un momento con su cuenta vieja
+                // (inactiva) mientras la app la reemplaza: no se le cierra la sesión a mitad del registro.
+                if (registrando) return
+                avisoSesion = if (!u.aprobado) "Tu registro no fue aprobado. Puedes volver a registrarte con el mismo correo y tu contraseña."
                 else "Tu cuenta está desactivada. Escríbele al administrador."
                 cerrarSesion()
             }
@@ -427,12 +430,15 @@ class EstadoApp : ViewModel() {
 
     suspend fun rechazarCliente(cliente: Usuario): Result<Unit> = ejecutar { UsuariosRepositorio.rechazarCliente(cliente, yo()) }
 
-    /** Crea la cuenta de alguien del equipo; Firebase le envía un correo para crear su contraseña. */
-    suspend fun crearUsuarioEquipo(context: Context, nombre: String, correo: String, rol: Rol): Result<Unit> = ejecutar(45) {
+    /**
+     * El admin crea una cuenta: de alguien del equipo o de un cliente, que queda aprobado de una vez.
+     * Firebase le envía a la persona un correo para crear su contraseña.
+     */
+    suspend fun crearUsuario(context: Context, datos: Usuario): Result<Unit> = ejecutar(45) {
         val admin = yo()
-        val uid = AuthRepositorio.crearCuentaEquipo(context.applicationContext, correo)
-        UsuariosRepositorio.guardarNuevoEquipo(
-            Usuario(uid, nombre.trim(), correo.trim(), rol, activo = true, aprobado = true, creadoEn = Timestamp.now()), admin
+        val uid = AuthRepositorio.crearCuentaPorAdmin(context.applicationContext, datos.correo)
+        UsuariosRepositorio.guardarNuevo(
+            datos.copy(id = uid, correo = datos.correo.trim(), activo = true, aprobado = true, creadoEn = Timestamp.now()), admin
         )
     }
 

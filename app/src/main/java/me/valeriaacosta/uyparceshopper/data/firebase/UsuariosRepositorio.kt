@@ -18,11 +18,16 @@ object UsuariosRepositorio {
 
     suspend fun obtener(uid: String): Usuario? = col.document(uid).get().await().aObjeto(Usuario::class.java)
 
-    /** Guarda a alguien del equipo (su cuenta ya se creó con AuthRepositorio.crearCuentaEquipo). */
-    suspend fun guardarNuevoEquipo(usuario: Usuario, admin: Usuario) {
+    /** Guarda una cuenta que creó el admin (la de Firebase ya se creó con AuthRepositorio.crearCuentaPorAdmin). */
+    suspend fun guardarNuevo(usuario: Usuario, admin: Usuario) {
         val lote = db.batch()
         lote.set(col.document(usuario.id), usuario)
-        AuditoriaRepositorio.registrar(lote, admin, "Creó usuario", "${usuario.nombre} · ${usuario.rol.etiqueta}")
+        val tipo = usuario.tipoCliente
+        if (usuario.rol == Rol.CLIENTE && tipo != null) {
+            AuditoriaRepositorio.registrar(lote, admin, "Creó cliente", "${usuario.nombre} · ${tipo.etiqueta}")
+        } else {
+            AuditoriaRepositorio.registrar(lote, admin, "Creó usuario", "${usuario.nombre} · ${usuario.rol.etiqueta}")
+        }
         lote.commit().await()
     }
 
@@ -33,7 +38,11 @@ object UsuariosRepositorio {
         lote.commit().await()
     }
 
-    /** Rechazar un registro desactiva la cuenta (sin servidor no se puede borrar la cuenta de Firebase). */
+    /**
+     * Rechazar un registro desactiva la cuenta (sin servidor, el admin no puede borrar la cuenta de Firebase).
+     * Si la persona se vuelve a registrar con el mismo correo, la app borra esa cuenta vieja y crea una
+     * nueva, que vuelve a "Por aprobar" (ver AuthRepositorio.registrar).
+     */
     suspend fun rechazarCliente(cliente: Usuario, admin: Usuario) {
         val lote = db.batch()
         lote.update(col.document(cliente.id), "activo", false)

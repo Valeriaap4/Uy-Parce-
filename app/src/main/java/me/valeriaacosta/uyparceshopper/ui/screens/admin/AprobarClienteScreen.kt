@@ -85,7 +85,9 @@ private fun AprobarClienteContenido(c: Usuario, onClickBack: () -> Unit, onListo
         }
     }
     if (rechazar) DialogoConfirmar(
-        "Rechazar registro", "${c.nombre} no podrá entrar a la app.", "Rechazar",
+        "Rechazar registro",
+        "${c.nombre} no podrá entrar a la app. Si vuelve a registrarse con el mismo correo, aparecerá otra vez en Por aprobar.",
+        "Rechazar",
         {
             guardando = true
             scope.launch {

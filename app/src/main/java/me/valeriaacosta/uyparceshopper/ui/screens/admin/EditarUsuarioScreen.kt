@@ -21,15 +21,16 @@ import me.valeriaacosta.uyparceshopper.data.mensaje
 import me.valeriaacosta.uyparceshopper.data.models.Rol
 import me.valeriaacosta.uyparceshopper.data.models.TipoCliente
 import me.valeriaacosta.uyparceshopper.data.models.Usuario
+import me.valeriaacosta.uyparceshopper.data.models.Zonas
 import me.valeriaacosta.uyparceshopper.ui.components.*
 import me.valeriaacosta.uyparceshopper.ui.theme.*
 
 // ─── EditarUsuarioScreen ─────────────────────────────────────────────────────
 
 /**
- * Pantalla 44. Sin id: agrega a alguien del equipo (Firebase le envía un correo para crear su
- * contraseña). Con id: edita nombre, rol, tipo de cliente y si la cuenta está activa.
- * Los clientes no se crean aquí: se registran solos desde la app.
+ * Pantalla 44. Sin id: crea una cuenta del equipo o de un cliente (el cliente queda aprobado de una vez)
+ * y Firebase le envía a la persona un correo para crear su contraseña. Con id: edita nombre, rol, tipo de
+ * cliente y si la cuenta está activa.
  */
 @Composable
 fun EditarUsuarioScreen(
@@ -49,16 +50,20 @@ private fun FormularioUsuario(u: Usuario?, onClickBack: () -> Unit, onGuardado: 
     val scope = rememberCoroutineScope()
     val esNuevo = u == null
     val soyYo = u?.id == estado.usuario?.id
-    // Al crear solo se ofrecen roles del equipo (los clientes se registran solos).
-    val roles = if (esNuevo) Rol.entries.filter { it != Rol.CLIENTE } else Rol.entries.toList()
 
     var nombre by rememberSaveable(u?.id) { mutableStateOf(u?.nombre ?: "") }
     var correo by rememberSaveable(u?.id) { mutableStateOf(u?.correo ?: "") }
     var rol by rememberSaveable(u?.id) { mutableStateOf(u?.rol) }
     var tipo by rememberSaveable(u?.id) { mutableStateOf(u?.tipoCliente) }
     var activo by rememberSaveable(u?.id) { mutableStateOf(u?.activo ?: true) }
+    // Datos de entrega: solo al crear un cliente (después los cambian el mismo cliente o el supervisor).
+    var cedula by rememberSaveable { mutableStateOf("") }
+    var telefono by rememberSaveable { mutableStateOf("") }
+    var ciudad by rememberSaveable { mutableStateOf<String?>(null) }
+    var direccion by rememberSaveable { mutableStateOf("") }
     var errores by remember { mutableStateOf(mapOf<String, String>()) }
     var guardando by remember { mutableStateOf(false) }
+    val clienteNuevo = esNuevo && rol == Rol.CLIENTE
 
     UpScreen(if (esNuevo) "Agregar usuario" else "Editar usuario", onClickBack, barraInferior = {
         BotonPrincipal("Guardar", {
@@ -67,12 +72,20 @@ private fun FormularioUsuario(u: Usuario?, onClickBack: () -> Unit, onGuardado: 
             if (esNuevo && !correoValido(correo)) e["c"] = "Correo no válido"
             if (rol == null) e["r"] = "Elige un rol"
             if (rol == Rol.CLIENTE && tipo == null) e["t"] = "Elige el tipo de cliente"
+            if (clienteNuevo) {
+                if (cedula.length !in 6..10) e["cedula"] = "La cédula tiene entre 6 y 10 dígitos"
+                if (telefono.filter(Char::isDigit).length != 10) e["telefono"] = "El celular tiene 10 dígitos"
+                if (ciudad == null) e["ciudad"] = "Elige la ciudad"
+                if (direccion.trim().length < 8) e["direccion"] = "Escribe la dirección completa"
+            }
             errores = e
             val rolElegido = rol
             if (e.isEmpty() && rolElegido != null) {
                 guardando = true
                 scope.launch {
-                    val resultado = if (u == null) estado.crearUsuarioEquipo(context, nombre, correo, rolElegido)
+                    val resultado = if (u == null) estado.crearUsuario(context, datosNuevos(
+                        nombre, correo, rolElegido, tipo, cedula, telefono, ciudad.orEmpty(), direccion
+                    ))
                     else estado.editarUsuario(u, nombre, rolElegido, tipo, activo)
                     resultado
                         .onSuccess {
@@ -90,11 +103,22 @@ private fun FormularioUsuario(u: Usuario?, onClickBack: () -> Unit, onGuardado: 
             CampoTexto("Correo", correo, { errores = errores - "c"; correo = it }, teclado = KeyboardType.Email,
                 error = errores["c"], soloLectura = !esNuevo)
             if (!esNuevo) Text("El correo no se puede cambiar: es con el que la persona inicia sesión.", color = Muted, fontSize = 13.sp)
-            Selector("Rol", roles.map { it.etiqueta }, rol?.etiqueta,
+            Selector("Rol", Rol.entries.map { it.etiqueta }, rol?.etiqueta,
                 { elegido -> errores = errores - "r"; rol = Rol.entries.first { it.etiqueta == elegido } }, error = errores["r"])
             if (rol == Rol.CLIENTE)
                 Selector("Tipo de cliente", TipoCliente.entries.map { it.etiqueta }, tipo?.etiqueta,
                     { elegido -> errores = errores - "t"; tipo = TipoCliente.entries.first { it.etiqueta == elegido } }, error = errores["t"])
+            if (clienteNuevo) {
+                CampoTexto("Cédula", cedula, { errores = errores - "cedula"; cedula = it.filter(Char::isDigit) },
+                    teclado = KeyboardType.Number, error = errores["cedula"])
+                CampoTexto("Teléfono / WhatsApp", telefono, { errores = errores - "telefono"; telefono = it.filter { c -> c.isDigit() || c == ' ' } },
+                    teclado = KeyboardType.Phone, placeholder = "300 000 0000", error = errores["telefono"])
+                Selector("Ciudad de entrega", Zonas.ciudades, ciudad, { errores = errores - "ciudad"; ciudad = it }, error = errores["ciudad"])
+                ciudad?.let { Text("Zona de envío: ${Zonas.nombreDe(it)}", color = Muted, fontSize = 13.sp) }
+                CampoTexto("Dirección de entrega", direccion, { errores = errores - "direccion"; direccion = it },
+                    placeholder = "Calle, número, barrio, apto", lineas = 2, error = errores["direccion"])
+                Text("El cliente queda aprobado de una vez, con el tipo que elijas.", color = Muted, fontSize = 13.sp)
+            }
             if (esNuevo) Text("Le llegará un correo para crear su contraseña (puede caer en spam).", color = Muted, fontSize = 13.sp)
             if (soyYo) Aviso("Esta es tu cuenta: no puedes quitarte el rol de administrador ni desactivarte.", TonoChip.AZUL)
             if (!esNuevo) Tarjeta {
@@ -111,6 +135,24 @@ private fun FormularioUsuario(u: Usuario?, onClickBack: () -> Unit, onGuardado: 
             }
         }
     }
+}
+
+/** Datos de la cuenta nueva: los de entrega solo se guardan si es un cliente. */
+private fun datosNuevos(
+    nombre: String, correo: String, rol: Rol, tipo: TipoCliente?,
+    cedula: String, telefono: String, ciudad: String, direccion: String
+): Usuario {
+    val esCliente = rol == Rol.CLIENTE
+    return Usuario(
+        nombre = nombre.trim().replace(Regex("\\s+"), " "),
+        correo = correo.trim(),
+        rol = rol,
+        tipoCliente = if (esCliente) tipo else null,
+        cedula = if (esCliente) cedula else "",
+        telefono = if (esCliente) telefono.trim() else "",
+        ciudad = if (esCliente) ciudad else "",
+        direccion = if (esCliente) direccion.trim() else ""
+    )
 }
 
 @Preview(showBackground = true)

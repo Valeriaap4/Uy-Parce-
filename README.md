@@ -117,8 +117,10 @@ Android Studio sin conectarse a Firebase.
 
 Sin `google-services.json` la app compila igual y abre una pantalla que explica que falta conectar Firebase.
 
-**Cuentas:** los clientes se registran desde la app y el admin los aprueba. Las cuentas del equipo las crea
-el admin en Usuarios → Agregar usuario, y a cada persona le llega un correo para crear su contraseña.
+**Cuentas:** los clientes se registran desde la app y el admin los aprueba. El admin también crea, en
+Usuarios → Agregar usuario, las cuentas del equipo y clientes ya aprobados; a cada persona le llega un
+correo para crear su contraseña. Si el admin rechaza un registro, la persona puede volver a registrarse con
+el mismo correo y su contraseña, y aparece otra vez en Por aprobar.
 
 ## Pruebas
 

@@ -8,6 +8,7 @@ import com.google.firebase.app
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
 import com.google.firebase.initialize
 import kotlinx.coroutines.tasks.await
@@ -26,25 +27,40 @@ object AuthRepositorio {
 
     /**
      * Crea la cuenta y su documento de usuario (cliente pendiente de aprobación).
-     * Si el correo ya tiene cuenta pero un registro anterior quedó a medias (sin documento), lo completa.
+     * Si el correo ya tiene cuenta, entra con la contraseña que escribió la persona y mira su documento:
+     * - no existe (un registro anterior quedó a medias): lo completa;
+     * - es un registro que el admin rechazó: la persona borra su cuenta vieja (sin servidor, el admin no
+     *   puede borrarla) y se crea una nueva, que vuelve a "Por aprobar";
+     * - es una cuenta en uso: avisa que ya existe.
      * Si falla al guardar el documento, borra la cuenta para que se pueda intentar de nuevo.
      */
     suspend fun registrar(datos: Usuario, clave: String): Usuario {
         val correo = datos.correo.trim()
         val cuenta = try {
-            auth.createUserWithEmailAndPassword(correo, clave).await().user
-                ?: throw ErrorNegocio("No se pudo crear la cuenta")
+            crearCuenta(correo, clave)
         } catch (e: FirebaseAuthUserCollisionException) {
             val existente = try {
                 auth.signInWithEmailAndPassword(correo, clave).await().user
             } catch (otro: Exception) {
                 null
-            } ?: throw e
-            if (db.collection(Col.USUARIOS).document(existente.uid).get().await().exists()) {
-                auth.signOut()
-                throw e
+            } ?: throw ErrorNegocio(
+                "Ese correo ya tiene una cuenta. Si es tuya, inicia sesión. Si te rechazaron el registro y no recuerdas " +
+                    "la contraseña, usa «¿Olvidaste tu contraseña?» y vuelve a registrarte con la nueva."
+            )
+            val anterior = db.collection(Col.USUARIOS).document(existente.uid).get().await()
+            val rechazado = anterior.aObjeto(Usuario::class.java)
+                ?.let { it.rol == Rol.CLIENTE && !it.aprobado && !it.activo } == true
+            when {
+                !anterior.exists() -> existente
+                rechazado -> {
+                    existente.delete().await()
+                    crearCuenta(correo, clave)
+                }
+                else -> {
+                    auth.signOut()
+                    throw ErrorNegocio("Ese correo ya tiene una cuenta. Inicia sesión con él.")
+                }
             }
-            existente
         }
         val usuario = datos.copy(
             id = cuenta.uid, correo = correo, rol = Rol.CLIENTE, aprobado = false, activo = true,
@@ -59,6 +75,9 @@ object AuthRepositorio {
         }
         return usuario
     }
+
+    private suspend fun crearCuenta(correo: String, clave: String): FirebaseUser =
+        auth.createUserWithEmailAndPassword(correo, clave).await().user ?: throw ErrorNegocio("No se pudo crear la cuenta")
 
     /**
      * Envía el correo para crear una contraseña nueva (en español). Si el correo no tiene cuenta no
@@ -76,19 +95,25 @@ object AuthRepositorio {
     fun cerrarSesion() = auth.signOut()
 
     /**
-     * El admin crea la cuenta de alguien del equipo sin cerrar su propia sesión: se usa una segunda
+     * El admin crea una cuenta (del equipo o de un cliente) sin cerrar su propia sesión: se usa una segunda
      * conexión a Firebase solo para crear la cuenta, con una contraseña al azar que nadie conoce.
      * Después Firebase le envía a esa persona un correo para que cree su propia contraseña.
      * Devuelve el uid de la cuenta nueva.
      */
-    suspend fun crearCuentaEquipo(context: Context, correo: String): String {
+    suspend fun crearCuentaPorAdmin(context: Context, correo: String): String {
         val nombreApp = "cuentas-equipo"
         val segunda = FirebaseApp.getApps(context).firstOrNull { it.name == nombreApp }
             ?: Firebase.initialize(context, Firebase.app.options, nombreApp)
         val auth2 = Firebase.auth(segunda)
         val claveAlAzar = UUID.randomUUID().toString() + "Aa1!"
-        val uid = auth2.createUserWithEmailAndPassword(correo.trim(), claveAlAzar).await().user?.uid
-            ?: throw ErrorNegocio("No se pudo crear la cuenta")
+        val uid = try {
+            auth2.createUserWithEmailAndPassword(correo.trim(), claveAlAzar).await().user?.uid
+        } catch (e: FirebaseAuthUserCollisionException) {
+            throw ErrorNegocio(
+                "Ese correo ya tiene una cuenta. Si es de un registro rechazado, la persona puede volver a " +
+                    "registrarse sola con ese correo y su contraseña."
+            )
+        } ?: throw ErrorNegocio("No se pudo crear la cuenta")
         auth2.signOut()
         recuperarClave(correo)
         return uid
